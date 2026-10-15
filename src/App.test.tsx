@@ -1,0 +1,10 @@
+import { afterEach,beforeEach,expect,it } from 'vitest';
+import { cleanup,render,screen,fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import App from './App';
+beforeEach(()=>{localStorage.clear();globalThis.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}}});
+afterEach(cleanup);
+it('自选股支持搜索、删除、添加，并持久化',async()=>{const u=userEvent.setup();render(<App/>);await u.click(screen.getByRole('button',{name:/我的自选/}));await u.type(screen.getByLabelText('搜索自选股票'),'AAPL');expect(screen.queryByText('MSFT')).toBeNull();await u.click(screen.getByLabelText('删除 AAPL'));expect(JSON.parse(localStorage.getItem('jaqtrax.watchlist')!)).not.toContain('AAPL');await u.click(screen.getByText('添加自选'));await u.click(screen.getByRole('button',{name:/AAPL Apple/}));expect(JSON.parse(localStorage.getItem('jaqtrax.watchlist')!)).toContain('AAPL');});
+it('手动持仓计算和重新挂载后的数据恢复',async()=>{const u=userEvent.setup();const view=render(<App/>);await u.click(screen.getByRole('button',{name:'投资组合'}));await u.click(screen.getByText('添加持仓'));await u.type(screen.getByLabelText('持仓数量'),'10');await u.type(screen.getByLabelText('买入单价'),'200');await u.click(screen.getByText('保存持仓'));expect(screen.getAllByText('$2,276.30').length).toBeGreaterThan(0);view.unmount();render(<App/>);await u.click(screen.getByRole('button',{name:'投资组合'}));expect(screen.getByLabelText('删除持仓 AAPL')).toBeTruthy();await u.click(screen.getByLabelText('删除持仓 AAPL'));expect(JSON.parse(localStorage.getItem('jaqtrax.holdings')!)).toEqual([]);});
+it('损坏的本地数据不导致崩溃，主题可以保存',async()=>{localStorage.setItem('jaqtrax.holdings','[{"bad":true}]');render(<App/>);await userEvent.click(screen.getByLabelText('切换浅色模式'));expect(localStorage.getItem('jaqtrax.theme')).toBe('"light"');});
+it('复利计算器响应输入变化',async()=>{render(<App/>);await userEvent.click(screen.getByRole('button',{name:'复利计算器'}));const initial=screen.getByText('$300,850.72');expect(initial).toBeTruthy();const input=screen.getAllByRole('spinbutton')[3];fireEvent.change(input,{target:{value:'0'}});expect(screen.getAllByText('$130,000.00').length).toBeGreaterThan(0);});
